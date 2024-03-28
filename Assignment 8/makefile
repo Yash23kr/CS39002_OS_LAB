@@ -3,3 +3,6 @@ all: mmu.c master.c sched.c process.c
 	gcc -o master master.c -fsanitize=address -g
 	gcc -o sched sched.c -fsanitize=address -g
 	gcc -o process process.c -fsanitize=address -g
+
+clean:
+	rm -f mmu master sched process

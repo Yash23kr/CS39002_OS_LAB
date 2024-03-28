@@ -97,7 +97,7 @@ int main(int argc,char* argv[])
             exit(0);
         }
     }
-    pid = fork();
+    int sched_pid = fork();
     if(pid==0)
     {
         char*args[10];
@@ -162,6 +162,7 @@ int main(int argc,char* argv[])
         rq.i = i;
         msgsnd(ready_queue_id,&rq,sizeof(rq.i),0);
     }
+    wait(sched_pid);
     shmdt(page_table);
     shmdt(free_frame_list);
     shmdt(process_pages);

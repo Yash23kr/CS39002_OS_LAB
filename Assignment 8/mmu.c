@@ -18,8 +18,14 @@ struct page_table{
 
 int main(int argc,char* argv[])
 {
-    for(int i=0;i<argc;i++)
+    int sched_mmu_id = atoi(argv[1]);
+    int process_mmu_id = atoi(argv[2]);
+    int page_table_id = atoi(argv[3]);
+    int free_frame_list_id = atoi(argv[4]);
+    int process_pages_id = atoi(argv[5]);
+    while(1)
     {
-        printf("%s\n",argv[i]);
+        
     }
+
 }
