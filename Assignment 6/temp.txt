@@ -1,0 +1,229 @@
+int main()
+{
+    eventQ E;
+    int i;
+    event e;
+    
+    pthread_attr_t attr;
+    pthread_t tid;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+    pthread_barrier_init(&barrier, NULL, 3);
+
+    E = initEQ("arrival.txt");
+    
+    pthread_create(&tid, &attr, doctor,NULL);
+
+    
+    while(!emptyQ(E))
+    {
+        e = nextevent(E);
+        while(!emptyQ(E)&&nextevent(E).time<=curtime)
+        {
+            if(e.type=='R')
+            {
+                printf("\t\t[%s] Reporter %d arrives\n",inttotime(e.time),1+reporter_count++);
+                reporter_duration[reporter_count]=e.duration;
+                pthread_create(&tid, &attr, reporter, (void *)reporter_count);
+                waiting_reporters++;
+            }
+            if(e.type=='P')
+            {
+                if(patient_num>=25)
+                {
+                    printf("\t\t[%s] Patient %d arrives\n",inttotime(e.time),1+patient_num++);
+                    printf("\t\t[%s] Patient %d leaves (Queue exhausted)\n",inttotime(e.time),patient_num);
+                    E = delevent(E);
+                    continue;
+                }
+                printf("\t\t[%s] Patient %d arrives\n",inttotime(e.time),1+patient_num++);
+                patient_duration[patient_num]=e.duration;
+                pthread_create(&tid, &attr, patient, (void *)patient_num);
+                waiting_patients++;
+            }
+            if(e.type=='S')
+            {
+                if(rep_num>=3)
+                {
+                    printf("\t\t[%s] Sales representative %d arrives\n",inttotime(e.time),1+rep_num++);
+                    printf("\t\t[%s] Sales representative %d leaves (Queue exhausted)\n",inttotime(e.time),rep_num);
+                    E = delevent(E);
+                    continue;
+                }
+                printf("\t\t[%s] Sales representative %d arrives\n",inttotime(e.time),1+rep_num++);
+                salesrep_duration[rep_num]=e.duration;
+                pthread_create(&tid, &attr, salesrep, (void *)rep_num);
+                waiting_reps++;
+            }
+            E = delevent(E);
+            e = nextevent(E);
+            //printf("\t\tNext event temp1: %c %d %d\n",e.type,e.time,e.duration);
+        }
+        if(e.time>curtime)break;
+        if(e.type=='E')
+        {
+            E = delevent(E);
+            e = nextevent(E);
+            //printf("\t\tNext event: %c %d %d\n",e.type,e.time,e.duration);
+        }
+    }
+    printf("\t\t[%s] Doctor arrives\n",inttotime(0));
+    while(1)
+    {
+        
+        int done=0;
+        e = nextevent(E);
+        while(!emptyQ(E)&&nextevent(E).time<=curtime)
+        {
+            e = nextevent(E);
+            if(e.type=='R')
+            {
+                printf("\t\t[%s] Reporter %d arrives\n",inttotime(e.time),1+reporter_count++);
+                reporter_duration[reporter_count]=e.duration;
+                pthread_create(&tid, &attr, reporter, (void *)reporter_count);
+                waiting_reporters++;
+            }
+            if(e.type=='P')
+            {
+                if(patient_num>=25)
+                {
+                    printf("\t\t[%s] Patient %d arrives\n",inttotime(e.time),1+patient_num++);
+                    printf("\t\t[%s] Patient %d leaves (Queue exhausted)\n",inttotime(e.time),patient_num);
+                    E = delevent(E);
+                    continue;
+                }
+                printf("\t\t[%s] Patient %d arrives\n",inttotime(e.time),1+patient_num++);
+                patient_duration[patient_num]=e.duration;
+                pthread_create(&tid, &attr, patient, (void*)patient_num);
+                waiting_patients++;
+            }
+            if(e.type=='S')
+            {
+                if(rep_num>=3)
+                {
+                    printf("\t\t[%s] Sales rep %d arrives\n",inttotime(e.time),1+rep_num++);
+                    printf("\t\t[%s] Sales rep %d leaves (Queue exhausted)\n",inttotime(e.time),rep_num);
+                    E = delevent(E);
+                    continue;
+                }
+                printf("\t\t[%s] Sales rep %d arrives\n",inttotime(e.time),1+rep_num++);
+                salesrep_duration[rep_num]=e.duration;
+                pthread_create(&tid, &attr, salesrep, (void*)rep_num);
+                waiting_reps++;
+            }
+            E = delevent(E);
+            e = nextevent(E);
+            //printf("\t\tNext event temp1: %c %d %d\n",e.type,e.time,e.duration);
+        }
+        if(waiting_patients==0 && waiting_reporters==0 && waiting_reps==0&&patient_num>=25&&rep_num>=3)
+        {
+            pthread_mutex_lock(&docmutex);
+            docdone=1;
+            pthread_cond_signal(&doccond);
+            pthread_mutex_unlock(&docmutex);
+            pthread_mutex_lock(&docmutex);
+            while(docdone==1)
+            {
+                pthread_cond_wait(&doccond, &docmutex);
+            }
+            pthread_mutex_unlock(&docmutex);
+            //printf("\t\tMain thread exiting\n");
+            break;
+        }
+        int arr[]={0,0,0};
+        if(waiting_reporters>0)
+        {
+            pthread_mutex_lock(&docmutex);
+            docdone=1;
+            pthread_cond_signal(&doccond);
+            pthread_mutex_unlock(&docmutex);
+            done=1;
+            pthread_mutex_lock(&docmutex);
+            while(docdone==1)
+            {
+                pthread_cond_wait(&doccond, &docmutex);
+            }
+            pthread_mutex_unlock(&docmutex);
+            pthread_mutex_lock(&reportermutex);
+            reporter_turn++;
+            //waiting_reporters--;
+            arr[0]++;
+            pthread_cond_broadcast(&reportercond);
+            pthread_mutex_unlock(&reportermutex);
+        }
+        else if(waiting_patients>0)
+        {
+            pthread_mutex_lock(&docmutex);
+            docdone=1;
+            pthread_cond_signal(&doccond);
+            pthread_mutex_unlock(&docmutex);
+            pthread_mutex_lock(&docmutex);
+            while(docdone==1)
+            {
+                pthread_cond_wait(&doccond, &docmutex);
+            }
+            pthread_mutex_unlock(&docmutex);
+            done=1;
+            pthread_mutex_lock(&patientmutex);
+            patient_turn++;
+            //waiting_patients--;
+            arr[1]++;
+            pthread_cond_broadcast(&patientcond);
+            pthread_mutex_unlock(&patientmutex);
+        }
+        else if(waiting_reps>0)
+        {
+            pthread_mutex_lock(&docmutex);
+            docdone=1;
+            pthread_cond_signal(&doccond);
+            pthread_mutex_unlock(&docmutex);
+            done=1;
+            pthread_mutex_lock(&docmutex);
+            while(docdone==1)
+            {
+                pthread_cond_wait(&doccond, &docmutex);
+            }
+            pthread_mutex_unlock(&docmutex);
+            pthread_mutex_lock(&repmutex);
+            rep_turn++;
+            //waiting_reps--;
+            arr[2]++;
+            pthread_cond_broadcast(&repcond);
+            pthread_mutex_unlock(&repmutex);
+        }
+        if(done==1)
+        {
+            pthread_barrier_wait(&barrier);
+            waiting_patients-=arr[1];
+            waiting_reporters-=arr[0];
+            waiting_reps-=arr[2];
+            //printf("\t\t%d %d %d %d %d\n",waiting_patients,waiting_reporters,waiting_reps,patient_num,rep_num);
+        }
+        else{
+            e = nextevent(E);
+            curtime = e.time;
+            //printf("\t\tChanging time manually\n");
+        }
+    }
+    while(!emptyQ(E))
+    {
+        e = nextevent(E);
+        if(e.type=='R')
+        {
+            printf("\t\t[%s] Reporter arrives\n",inttotime(e.time));
+            printf("\t\t[%s] Reporter leaves(session over)\n",inttotime(e.time));
+        }
+        if(e.type=='P')
+        {
+            printf("\t\t[%s] Patient arrives\n",inttotime(e.time));
+            printf("\t\t[%s] Patient leaves(session over)\n",inttotime(e.time));
+        }
+        if(e.type=='S')
+        {
+            printf("\t\t[%s] Sales rep arrives\n",inttotime(e.time));
+            printf("\t\t[%s] Sales rep leaves(session over)\n",inttotime(e.time));
+        }
+        E = delevent(E);
+    }
+    pthread_exit(NULL);
+}
