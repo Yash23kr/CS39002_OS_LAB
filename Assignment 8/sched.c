@@ -29,7 +29,7 @@ struct sched_mmu_message{
     long mtype;
     int i;
 };
-
+int timestamp=0;
 int main(int argc,char* argv[])
 {
     // for(int i=0;i<argc;i++)
@@ -61,10 +61,16 @@ int main(int argc,char* argv[])
             exit(1);
         }
         struct sched_mmu_message mmu_message;
-        msgrcv(sched_mmu_id,&mmu_message,sizeof(mmu_message.i),0,0);
+        retval = msgrcv(sched_mmu_id,&mmu_message,sizeof(mmu_message.i),0,0);
+        if(retval==-1)
+        {
+            perror("msgrcv on sched_mmu_id");
+            exit(1);
+        }
         if(mmu_message.i==1)
         {
             msgsnd(ready_queue_id,&message,sizeof(message.i),0);
         }
+        
     }
 }

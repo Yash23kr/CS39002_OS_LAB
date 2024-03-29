@@ -90,7 +90,7 @@ int main(int argc,char* argv[])
     int* free_frame_list = (int*)shmat(free_frame_list_id,NULL,0);
     for(int i=0;i<frames;i++)
     {
-        free_frame_list[i] = 1;
+        free_frame_list[i] = -1;
     }
     int process_pages_id = shmget(ftok("master.c",3),sizeof(int)*num_processes,IPC_CREAT|0666);
     int* process_pages = (int*)shmat(process_pages_id,NULL,0);
@@ -103,8 +103,8 @@ int main(int argc,char* argv[])
     int process_mmu_id = msgget(ftok("master.c",6),IPC_CREAT|0666);
     int process_sched_id = msgget(ftok("master.c",7),IPC_CREAT|0666);
     printf("Process_sched_id = %d\n",process_sched_id);
-    int pid = fork();
-    if(pid==0)
+    int mmupid = fork();
+    if(mmupid==0)
     {
         char* args[10];
         args[0] = (char*)malloc(10*sizeof(char));
@@ -119,7 +119,11 @@ int main(int argc,char* argv[])
         sprintf(args[4],"%d",free_frame_list_id);
         args[5] = (char*)malloc(10*sizeof(char));
         sprintf(args[5],"%d",process_pages_id);
-        args[6]=NULL;
+        args[6] = (char*)malloc(10*sizeof(char));
+        sprintf(args[6],"%d",frames);
+        args[7]=(char*)malloc(10*sizeof(char));
+        sprintf(args[7],"%d",num_processes);
+        args[8] = NULL;
         int retval = execvp(args[0],args);
         if(retval==-1)
         {
@@ -151,12 +155,14 @@ int main(int argc,char* argv[])
     char** reference_strings[num_processes];
     int reference_lengths[num_processes];
     int total_pages[num_processes];
+    int sum=0;
     for(int i=0;i<num_processes;i++)
     {
         int process_pages = rand()%max_pages+1;
         int len = rand()%(8*process_pages+1)+2*process_pages; 
         total_pages[i] = process_pages;
         reference_lengths[i] = len;
+        sum+=process_pages;
         reference_strings[i] = (char**)malloc(len*sizeof(char*));
         for(int j=0;j<len;j++)
         {
@@ -171,6 +177,22 @@ int main(int argc,char* argv[])
             }
             //printf("%s\n",reference_strings[i][j]);
         }
+    }
+    int cur=0;
+    for(int i=0;i<num_processes;i++)
+    {
+        int temp = ((float)total_pages[i]/(float)sum)*(float)frames;
+        printf("i=%d,temp=%d\n",i,temp);
+        while(temp)
+        {
+            free_frame_list[cur] = i;
+            cur++;
+            temp--;
+        }
+    }
+    for(int i=0;i<num_processes;i++)
+    {
+        process_pages[i] = total_pages[i];
     }
     for(int i=0;i<num_processes;i++)
     {
@@ -203,7 +225,7 @@ int main(int argc,char* argv[])
         // }
         // printf("\n");
         args[5+len] = NULL;
-        pid = fork();
+        int pid = fork();
         if(pid==0)
         {
             int retval = execvp(args[0],args);
@@ -224,8 +246,9 @@ int main(int argc,char* argv[])
             exit(0);
         }
     }
-    sleep(300);
-    waitpid(sched_pid,0,0);
+    //sleep(300);
+    waitpid(mmupid,0,0);
+    kill(sched_pid,SIGKILL);
     shmdt(page_table);
     shmdt(free_frame_list);
     shmdt(process_pages);
