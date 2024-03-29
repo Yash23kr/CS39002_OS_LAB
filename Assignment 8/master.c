@@ -35,7 +35,34 @@ struct ready_queue_message{
     long mtype;
     int i;
 };
-
+int num_processes,frames;
+void sig_handler(int signo)
+{
+    if(signo==SIGINT)
+    {
+        int page_table_id = shmget(ftok("master.c",1),sizeof(struct page_table)*num_processes,IPC_CREAT|0666);
+        struct page_table* page_table = (struct page_table*)shmat(page_table_id,NULL,0);
+        int free_frame_list_id = shmget(ftok("master.c",2),sizeof(int)*frames,IPC_CREAT|0666);
+        int* free_frame_list = (int*)shmat(free_frame_list_id,NULL,0);
+        int process_pages_id = shmget(ftok("master.c",3),sizeof(int)*num_processes,IPC_CREAT|0666);
+        int* process_pages = (int*)shmat(process_pages_id,NULL,0);
+        int ready_queue_id = msgget(ftok("master.c",4),IPC_CREAT|0666);
+        int sched_mmu_id = msgget(ftok("master.c",5),IPC_CREAT|0666);
+        int process_mmu_id = msgget(ftok("master.c",6),IPC_CREAT|0666);
+        int process_sched_id = msgget(ftok("master.c",7),IPC_CREAT|0666);
+        shmdt(page_table);
+        shmdt(free_frame_list);
+        shmdt(process_pages);
+        shmctl(page_table_id,IPC_RMID,NULL);
+        shmctl(free_frame_list_id,IPC_RMID,NULL);
+        shmctl(process_pages_id,IPC_RMID,NULL);
+        msgctl(ready_queue_id,IPC_RMID,NULL);
+        msgctl(sched_mmu_id,IPC_RMID,NULL);
+        msgctl(process_mmu_id,IPC_RMID,NULL);
+        msgctl(process_sched_id,IPC_RMID,NULL);
+        exit(0);
+    }
+}
 int main(int argc,char* argv[])
 {
     if(argc!=4)
@@ -44,9 +71,10 @@ int main(int argc,char* argv[])
         exit(0);
     }
     srand(time(0));
-    int num_processes = atoi(argv[1]);
+    signal(SIGINT,sig_handler);
+    num_processes = atoi(argv[1]);
     int max_pages = atoi(argv[2]);
-    int frames = atoi(argv[3]);
+    frames = atoi(argv[3]);
     int page_table_id = shmget(ftok("master.c",1),sizeof(struct page_table)*num_processes,IPC_CREAT|0666);
     struct page_table* page_table = (struct page_table*)shmat(page_table_id,NULL,0);
     for(int i=0;i<num_processes;i++)
