@@ -35,6 +35,7 @@ struct ready_queue_message{
     long mtype;
     int i;
 };
+
 int main(int argc,char* argv[])
 {
     if(argc!=4)
@@ -73,6 +74,7 @@ int main(int argc,char* argv[])
     int sched_mmu_id = msgget(ftok("master.c",5),IPC_CREAT|0666);
     int process_mmu_id = msgget(ftok("master.c",6),IPC_CREAT|0666);
     int process_sched_id = msgget(ftok("master.c",7),IPC_CREAT|0666);
+    printf("Process_sched_id = %d\n",process_sched_id);
     int pid = fork();
     if(pid==0)
     {
@@ -93,12 +95,12 @@ int main(int argc,char* argv[])
         int retval = execvp(args[0],args);
         if(retval==-1)
         {
-            perror("execvp:");
+            perror("execvp mmu");
             exit(0);
         }
     }
     int sched_pid = fork();
-    if(pid==0)
+    if(sched_pid==0)
     {
         char*args[10];
         args[0] = (char*)malloc(10*sizeof(char));
@@ -113,15 +115,40 @@ int main(int argc,char* argv[])
         int retval = execvp(args[0],args);
         if(retval==-1)
         {
-            perror("execvp:");
+            perror("execvp sched");
             exit(0);
+        }
+    }
+
+    char** reference_strings[num_processes];
+    int reference_lengths[num_processes];
+    int total_pages[num_processes];
+    for(int i=0;i<num_processes;i++)
+    {
+        int process_pages = rand()%max_pages+1;
+        int len = rand()%(8*process_pages+1)+2*process_pages; 
+        total_pages[i] = process_pages;
+        reference_lengths[i] = len;
+        reference_strings[i] = (char**)malloc(len*sizeof(char*));
+        for(int j=0;j<len;j++)
+        {
+            reference_strings[i][j] = (char*)malloc(10*sizeof(char));
+            if(gen_bool())
+            {
+                sprintf(reference_strings[i][j],"%d",rand()%process_pages+process_pages);
+            }
+            else
+            {
+                sprintf(reference_strings[i][j],"%d",rand()%process_pages);
+            }
+            //printf("%s\n",reference_strings[i][j]);
         }
     }
     for(int i=0;i<num_processes;i++)
     {
         usleep(250000);
-        int process_pages = rand()%max_pages+1;
-        int len = rand()%(8*process_pages+1)+2*process_pages; 
+        int process_pages = total_pages[i];
+        int len = reference_lengths[i];
         printf("Process %d, len %d, process_pages %d\n",i,len,process_pages);
         char* args[10+len];
         args[0] = (char*)malloc(10*sizeof(char));
@@ -134,18 +161,19 @@ int main(int argc,char* argv[])
         sprintf(args[3],"%d",process_sched_id);
         args[4] = (char*)malloc(10*sizeof(char));
         sprintf(args[4],"%d",process_mmu_id);
-        for(int i=0;i<len;i++)
+        for(int j=0;j<len;j++)
         {
-            args[5+i] = (char*)malloc(10*sizeof(char));
-            if(gen_bool())
-            {
-                sprintf(args[5+i],"%d",rand()%process_pages+process_pages);
-            }
-            else
-            {
-                sprintf(args[5+i],"%d",rand()%process_pages);
-            }
+            args[5+j] = (char*)malloc(10*sizeof(char));
+            strcpy(args[5+j],reference_strings[i][j]);
+            //printf("%s\n",args[5+i]);
+            //printf("%lld ",args[5+j]);
         }
+        // printf("\n");
+        // for(int i=0;i<6+len;i++)
+        // {
+        //     printf("%lld ",args[i]);
+        // }
+        // printf("\n");
         args[5+len] = NULL;
         pid = fork();
         if(pid==0)
@@ -153,16 +181,23 @@ int main(int argc,char* argv[])
             int retval = execvp(args[0],args);
             if(retval==-1)
             {
-                perror("execvp:");
+                perror("execvp process");
                 exit(0);
             }
         }
         struct ready_queue_message rq;
         rq.mtype = 1;
         rq.i = i;
-        msgsnd(ready_queue_id,&rq,sizeof(rq.i),0);
+        int retval = msgsnd(ready_queue_id,&rq,sizeof(int),0);
+        printf("Message sent,retval = %d,ready_queue_id = %d\n",retval,ready_queue_id);
+        if(retval==-1)
+        {
+            perror("msgsnd master");
+            exit(0);
+        }
     }
-    wait(sched_pid);
+    sleep(300);
+    waitpid(sched_pid,0,0);
     shmdt(page_table);
     shmdt(free_frame_list);
     shmdt(process_pages);
