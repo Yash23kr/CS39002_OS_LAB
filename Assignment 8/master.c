@@ -67,7 +67,7 @@ int main(int argc,char* argv[])
 {
     if(argc!=4)
     {
-        printf("Usage: master k m f\n");
+        //printf("Usage: master k m f\n");
         exit(0);
     }
     srand(time(0));
@@ -102,28 +102,32 @@ int main(int argc,char* argv[])
     int sched_mmu_id = msgget(ftok("master.c",5),IPC_CREAT|0666);
     int process_mmu_id = msgget(ftok("master.c",6),IPC_CREAT|0666);
     int process_sched_id = msgget(ftok("master.c",7),IPC_CREAT|0666);
-    printf("Process_sched_id = %d\n",process_sched_id);
+    //printf("Process_sched_id = %d\n",process_sched_id);
     int mmupid = fork();
     if(mmupid==0)
     {
-        char* args[10];
+        char* args[15];
         args[0] = (char*)malloc(10*sizeof(char));
-        strcpy(args[0],"./mmu");
+        sprintf(args[0],"xterm");
         args[1] = (char*)malloc(10*sizeof(char));
-        sprintf(args[1],"%d",sched_mmu_id);
+        sprintf(args[1],"-e");
         args[2] = (char*)malloc(10*sizeof(char));
-        sprintf(args[2],"%d",process_mmu_id);
+        strcpy(args[2],"./mmu");
         args[3] = (char*)malloc(10*sizeof(char));
-        sprintf(args[3],"%d",page_table_id);
+        sprintf(args[3],"%d",sched_mmu_id);
         args[4] = (char*)malloc(10*sizeof(char));
-        sprintf(args[4],"%d",free_frame_list_id);
+        sprintf(args[4],"%d",process_mmu_id);
         args[5] = (char*)malloc(10*sizeof(char));
-        sprintf(args[5],"%d",process_pages_id);
+        sprintf(args[5],"%d",page_table_id);
         args[6] = (char*)malloc(10*sizeof(char));
-        sprintf(args[6],"%d",frames);
-        args[7]=(char*)malloc(10*sizeof(char));
-        sprintf(args[7],"%d",num_processes);
-        args[8] = NULL;
+        sprintf(args[6],"%d",free_frame_list_id);
+        args[7] = (char*)malloc(10*sizeof(char));
+        sprintf(args[7],"%d",process_pages_id);
+        args[8] = (char*)malloc(10*sizeof(char));
+        sprintf(args[8],"%d",frames);
+        args[9]=(char*)malloc(10*sizeof(char));
+        sprintf(args[9],"%d",num_processes);
+        args[10] = NULL;
         int retval = execvp(args[0],args);
         if(retval==-1)
         {
@@ -175,14 +179,14 @@ int main(int argc,char* argv[])
             {
                 sprintf(reference_strings[i][j],"%d",rand()%process_pages);
             }
-            //printf("%s\n",reference_strings[i][j]);
+            ////printf("%s\n",reference_strings[i][j]);
         }
     }
     int cur=0;
     for(int i=0;i<num_processes;i++)
     {
         int temp = ((float)total_pages[i]/(float)sum)*(float)frames;
-        printf("i=%d,temp=%d\n",i,temp);
+        //printf("i=%d,temp=%d\n",i,temp);
         while(temp)
         {
             free_frame_list[cur] = i;
@@ -199,7 +203,7 @@ int main(int argc,char* argv[])
         usleep(250000);
         int process_pages = total_pages[i];
         int len = reference_lengths[i];
-        printf("Process %d, len %d, process_pages %d\n",i,len,process_pages);
+        //printf("Process %d, len %d, process_pages %d\n",i,len,process_pages);
         char* args[10+len];
         args[0] = (char*)malloc(10*sizeof(char));
         strcpy(args[0],"./process");
@@ -215,15 +219,15 @@ int main(int argc,char* argv[])
         {
             args[5+j] = (char*)malloc(10*sizeof(char));
             strcpy(args[5+j],reference_strings[i][j]);
-            //printf("%s\n",args[5+i]);
-            //printf("%lld ",args[5+j]);
+            ////printf("%s\n",args[5+i]);
+            ////printf("%lld ",args[5+j]);
         }
-        // printf("\n");
+        // //printf("\n");
         // for(int i=0;i<6+len;i++)
         // {
-        //     printf("%lld ",args[i]);
+        //     //printf("%lld ",args[i]);
         // }
-        // printf("\n");
+        // //printf("\n");
         args[5+len] = NULL;
         int pid = fork();
         if(pid==0)
@@ -239,7 +243,7 @@ int main(int argc,char* argv[])
         rq.mtype = 1;
         rq.i = i;
         int retval = msgsnd(ready_queue_id,&rq,sizeof(int),0);
-        printf("Message sent,retval = %d,ready_queue_id = %d\n",retval,ready_queue_id);
+        //printf("Message sent,retval = %d,ready_queue_id = %d\n",retval,ready_queue_id);
         if(retval==-1)
         {
             perror("msgsnd master");

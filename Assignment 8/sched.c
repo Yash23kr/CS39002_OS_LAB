@@ -34,7 +34,7 @@ int main(int argc,char* argv[])
 {
     // for(int i=0;i<argc;i++)
     // {
-    //     printf("%s\n",argv[i]);
+    //     //printf("%s\n",argv[i]);
     // }
     int ready_queue_id = atoi(argv[1]);
     int sched_mmu_id = atoi(argv[2]);
@@ -43,7 +43,7 @@ int main(int argc,char* argv[])
     {
         struct ready_queue_message message;
         int retval = msgrcv(ready_queue_id,&message,sizeof(message.i),0,0);
-        printf("Message received from ready queue, i=%d\n",message.i);
+        //printf("Message received from ready queue, i=%d\n",message.i);
         fflush(stdout);
         if(retval==-1)
         {
@@ -52,12 +52,12 @@ int main(int argc,char* argv[])
         }
         struct process_sched_message sched_message;
         sched_message.mtype = message.i+1;
-        printf("Sending message to process_sched_id = %d,sched_message.mtype = %ld\n",process_sched_id,sched_message.mtype);
+        //printf("Sending message to process_sched_id = %d,sched_message.mtype = %ld\n",process_sched_id,sched_message.mtype);
         retval = msgsnd(process_sched_id,&sched_message,0,0);
         if(retval==-1)
         {
             perror("msgsnd");
-            printf("process_sched_id = %d,sched_message.mtype = %ld\n",process_sched_id,sched_message.mtype);
+            //printf("process_sched_id = %d,sched_message.mtype = %ld\n",process_sched_id,sched_message.mtype);
             exit(1);
         }
         struct sched_mmu_message mmu_message;

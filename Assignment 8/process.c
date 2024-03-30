@@ -6,6 +6,7 @@
 #include <sys/msg.h>
 #include <stdbool.h>
 #include <signal.h>
+#include<unistd.h>
 struct table_entry{
     int frame_number;
     bool valid;
@@ -44,7 +45,7 @@ int main(int argc, char* argv[])
         perror("msgrcv");
         exit(1);
     }
-    printf("Message received in process, process_sched_id = %d,retval = %d\n",process_sched_id,retval);
+    //printf("Message received in process, process_sched_id = %d,retval = %d\n",process_sched_id,retval);
     fflush(stdout);
     for(int i=5;i<argc;i++)
     {
@@ -52,7 +53,7 @@ int main(int argc, char* argv[])
         msg.mtype = 3;
         msg.i = index;
         msg.page_number = atoi(argv[i]);
-        printf("Sending message to process_mmu_id = %d,msg.mtype = %ld,msg.i = %d,msg.page_number = %d\n",process_mmu_id,msg.mtype,msg.i,msg.page_number);
+        //printf("Sending message to process_mmu_id = %d,msg.mtype = %ld,msg.i = %d,msg.page_number = %d\n",process_mmu_id,msg.mtype,msg.i,msg.page_number);
         retval = msgsnd(process_mmu_id,&msg,sizeof(msg)-sizeof(long),0);
         if(retval==-1)
         {
@@ -68,14 +69,14 @@ int main(int argc, char* argv[])
         }
         if(msg2.frame_number==-2)
         {
-            printf("Segfault\n");
+            //printf("Segfault\n");
             fflush(stdout);
             return 0;
         }
         else if(msg2.frame_number==-1)
         {
                 // struct process_sched_message msg;
-                // printf("Going to wait on ready queue\n");
+                // //printf("Going to wait on ready queue\n");
                 // int retval = msgrcv(process_sched_id,&msg,0,index+1,0);
                 // if(retval==-1)
                 // {
@@ -83,31 +84,32 @@ int main(int argc, char* argv[])
                 //     exit(1);
                 // }
                 struct process_sched_message msg;
-                printf("Going to wait on ready queue,process_sched_id = %d,index+1=%d\n",process_sched_id,index+1);
-                fflush(stdout);
+                //printf("Going to wait on ready queue,process_sched_id = %d,index+1=%d\n",process_sched_id,index+1);
+                //fflush(stdout);
                 int retval = msgrcv(process_sched_id,&msg,0,index+1,0);
-                printf("Out of ready queue\n");
-                fflush(stdout);
+                //printf("Out of ready queue\n");
+                //fflush(stdout);
                 if(retval==-1)
                 {
                     perror("msgrcv");
                     exit(1);
                 }
-                printf("Message received in process, process_sched_id = %d,retval = %d\n",process_sched_id,retval);
+                //printf("Message received in process, process_sched_id = %d,retval = %d\n",process_sched_id,retval);
                 fflush(stdout);
                 i--;
         }
         else
         {
-            printf("Found page at frame at %d\n",msg2.frame_number);
+            //printf("Found page at frame at %d\n",msg2.frame_number);
         }
+        //sleep(1);
 
     }
     struct process_mmu_message msg2;
     msg2.mtype = 3;
     msg2.i = index;
     msg2.page_number = -9;
-    printf("Sending message to process_mmu_id = %d,msg.mtype = %ld,msg.i = %d,msg.page_number = %d\n",process_mmu_id,msg2.mtype,msg2.i,msg2.page_number);
+    //printf("Sending message to process_mmu_id = %d,msg.mtype = %ld,msg.i = %d,msg.page_number = %d\n",process_mmu_id,msg2.mtype,msg2.i,msg2.page_number);
     retval = msgsnd(process_mmu_id,&msg2,sizeof(msg2)-sizeof(long),0);
     if(retval==-1)
     {

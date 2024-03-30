@@ -6,7 +6,12 @@
 #include <sys/msg.h>
 #include <stdbool.h>
 #include <signal.h>
-#include<sys/shm.h>
+#include <sys/shm.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>
+#include <unistd.h>
 struct table_entry{
     int frame_number;
     bool valid;
@@ -45,6 +50,7 @@ int main(int argc,char* argv[])
     int* process_pages = (int*)shmat(process_pages_id,NULL,0);
     int frames = atoi(argv[6]);
     int num_processes = atoi(argv[7]);
+    int fd = open("result.txt",O_CREAT|O_WRONLY,0666);
     while(num_processes)
     {
         struct process_mmu_message message;
@@ -53,12 +59,16 @@ int main(int argc,char* argv[])
         {
             perror("Error in receiving message");
         }
-        printf("Message received in mmu, i=%d,page_number=%d\n",message.i,message.page_number);
+        //printf("Message received in mmu, i=%d,page_number=%d\n",message.i,message.page_number);
         int index = message.i;
         int page_number = message.page_number;
-        if(page_number>=process_pages[index])
+        if(page_number>=process_pages[index]||(page_number<0&&page_number!=-9))
         {
-            printf("INVALID PAGE NUMBER\n");
+            //printf("INVALID PAGE NUMBER\n");
+            printf("Invalid page reference: (%d,%d)\n",index,page_number);
+            char buffer[100];
+            sprintf(buffer,"Invalid page reference: (%d,%d)\n",index,page_number);
+            write(fd,buffer,strlen(buffer));
             struct mmu_process_message response;
             response.mtype = 2;
             response.frame_number = -2;
@@ -107,7 +117,11 @@ int main(int argc,char* argv[])
         }
         if(pagetable[index].entries[page_number].valid)
         {
-            printf("Page already in memory\n");
+            //printf("Page already in memory\n");
+            printf("Page access: (%d,%d,%d)\n",timer,index,page_number);
+            char buffer[100];
+            sprintf(buffer,"Page access: (%d,%d,%d)\n",timer,index,page_number);
+            write(fd,buffer,strlen(buffer));
             pagetable[index].entries[page_number].previous_access = timer;
             timer++;
             struct mmu_process_message response;
@@ -120,6 +134,10 @@ int main(int argc,char* argv[])
             }
             continue;
         }
+        printf("Page fault: (%d,%d)\n",index,page_number);
+        char buffer[100];
+        sprintf(buffer,"Page fault: (%d,%d)\n",index,page_number);
+        write(fd,buffer,strlen(buffer));
         int alloted_frames = 0;
         for(int i=0;i<frames;i++)
         {
@@ -137,9 +155,9 @@ int main(int argc,char* argv[])
         }
         if(alloted_frames)
         {
-            printf("Process has free frames alloted to it\n");
+            //printf("Process has free frames alloted to it\n");
             pagetable[index].entries[page_number].valid=true;
-            pagetable[index].entries[page_number].previous_access = timer++;
+            pagetable[index].entries[page_number].previous_access = timer;
             int i=0;
             for(;i<frames;i++)
             {
@@ -180,10 +198,10 @@ int main(int argc,char* argv[])
         {
             if(free_frame_list[i]==-1)
             {
-                printf("Stealing a global free frame\n");
+                //printf("Stealing a global free frame\n");
                 free_frame_list[i] = index;
                 pagetable[index].entries[page_number].valid = true;
-                pagetable[index].entries[page_number].previous_access = timer++;
+                pagetable[index].entries[page_number].previous_access = timer;
                 pagetable[index].entries[page_number].frame_number = i;
                 struct mmu_process_message response;
                 response.mtype = 2;
@@ -207,7 +225,7 @@ int main(int argc,char* argv[])
         }
         if(found)continue;
 
-        printf("No free frames available, replacing page\n");
+        //printf("No free frames available, replacing page\n");
         int replacement_index = -1;
         int min = 1000000;
         for(int i=0;i<process_pages[index];i++)
@@ -224,6 +242,7 @@ int main(int argc,char* argv[])
         if(replacement_index==-1)
         {
             printf("No frames have been allocated to the process yet\n");
+            write(fd,"No frames have been allocated to the process yet\n",strlen("No frames have been allocated to the process yet\n"));
             struct mmu_process_message response;
             response.mtype = 2;
             response.frame_number = -1;
@@ -242,9 +261,9 @@ int main(int argc,char* argv[])
             }
             continue;
         }
-        printf("Replacing page %d\n",replacement_index);
+        printf("Replacing page: (%d,%d)\n",index,replacement_index);
         pagetable[index].entries[page_number].valid = true;
-        pagetable[index].entries[page_number].previous_access = timer++;
+        pagetable[index].entries[page_number].previous_access = timer;
         pagetable[index].entries[page_number].frame_number = pagetable[index].entries[replacement_index].frame_number;
         pagetable[index].entries[replacement_index].valid = false;
         struct mmu_process_message response;
